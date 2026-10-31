@@ -15,6 +15,35 @@
 __global__ void ger_kernel(int m, int n, float alpha, const float* x, const float* y, float* A)
 {
     // TODO: write your CUDA kernel here
+     __shared__ float sdata[16];
+
+    const int tx  = threadIdx.x;
+    const int ty = threadIdx.y;
+
+    const int gtx = blockIdx.x * blockDim.x + tx;
+    const int gty = blockIdx.y * blockDim.y + ty;
+    const int stridex = gridDim.x * blockDim.x;
+    const int stridey = gridDim.y * blockDim.y;
+
+    for (int i = gtx; i < m; i += stridex) {
+        if (ty == 0) {
+            sdata[tx] = i < m? x[i] : 0.0f;
+        }
+
+        __syncthreads();
+
+        for (int j = gty; j < n; j += stridey) {
+            if (i < m && j < n) {
+                A[j * m + i] += alpha * sdata[tx] * y[j];
+            }
+        }
+
+        __syncthreads();
+       
+    }
+    
+   
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +137,7 @@ int main(int argc, char** argv)
     // n1000: configure your kernel here
     // TODO: the configuration below is a default that you must change
     dim3 block(16, 16, 1);
-    dim3 grid( 1, 1, 1);
+    dim3 grid( (m + 16 - 1) / 16, (n + 16 - 1) / 16, 1);
     // end of TODO: kernel configuration
 
     cudaEvent_t start, stop;
